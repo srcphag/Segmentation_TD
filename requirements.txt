@@ -1,0 +1,16 @@
+# YOLO11 Realtime Instance Segmentation
+# Requirements
+
+# Core dependencies
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+torch>=2.0.0
+timm>=1.0.0  # Required for SAM3
+
+# Optional: GPU acceleration
+# Install appropriate version for your CUDA version
+# torch with CUDA: pip install torch --index-url https://download.pytorch.org/whl/cu118
+
+# Optional: Faster inference
+# onnx>=1.14.0
+# onnxruntime-gpu>=1.15.0  # For ONNX inference

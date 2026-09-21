@@ -1,0 +1,36 @@
+# Models (downloaded at runtime)
+models/
+
+# Local environments
+.env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.code-workspace
+
+# TouchDesigner backup files
+*.*.toe
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project-specific
+conversation-summary.md
+ultralytics-docs/
+output/
+test_images/
+temp/
+Backup/
+runs/
