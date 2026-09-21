@@ -1,312 +1,113 @@
 # Segment Everything TD
 
-A multi-backend segmentation toolkit designed for creative applications and TouchDesigner integration. Supports YOLO11 for realtime performance, Meta SAM 2 for zero-shot segmentation, and SAM 3 for text-based concept segmentation.
+Run **YOLO11, SAM 2, and SAM 3** segmentation inference directly inside **TouchDesigner** with a single Script TOP - no subprocess, no external window, no file round-trip.
 
-## Overview
+Wire any TOP (camera, movie, render) into the input and get an annotated output TOP with per-object masks, in realtime for YOLO and on-demand for SAM 2 / SAM 3.
 
-**Segment Everything TD** bridges the gap between state-of-the-art segmentation models and creative tools like TouchDesigner. Whether you need realtime webcam segmentation, automatic mask generation, or text-prompted object detection, this toolkit provides a unified interface with seamless TD integration.
+## Key Features
 
-### Key Features
+- **Script TOP inference** - segmentation runs on TD's main thread via `td_script_top.py`, parameterized on a custom **Segmentation** page
+- **Multi-backend** - switch `yolo` / `sam` / `sam3` from a menu parameter
+- **YOLO11 realtime** - runs every frame (30-100+ FPS with the nano model)
+- **SAM 2 prompts** - point and box prompts via parameters
+- **SAM 3 text** - concept segmentation ("person, car", "person with red shirt")
+- **Segment everything (AMG)** - point-grid + NMS automatic mask generation
+- **Mask Only** - white-on-black mask output for downstream compositing
+- **On-demand SAM** - slow backends run via a **Run SAM** pulse, cached between runs
+- **CLI included** - `main.py` for webcam/image batch work; `td_segment.py` legacy subprocess wrapper
 
-- **TouchDesigner Integration** - Custom COMP with subprocess-based processing, progress reporting, and dynamic mask loading
-- **Multi-Backend Architecture** - Switch between YOLO11, SAM 2, and SAM 3 based on your needs
-- **Automatic Mask Generation** - Segment everything in an image without prompts
-- **Text Prompts** - Find all instances of a concept using natural language (SAM 3)
-- **Visual Prompts** - Point and box prompts for precise segmentation (SAM 2)
-- **Realtime Performance** - 30-100+ FPS webcam segmentation (YOLO11)
-- **Progress Reporting** - Live progress updates during SAM processing
+## Quick Start
 
----
+1. **Install** into a Python 3.11 venv (matches TD 2023+):
+   ```bash
+   python -m venv .env
+   .env\Scripts\activate            # Windows
+   pip install -r requirements.txt
+   ```
+2. **Point TD at the venv** - Edit > Preferences > Python > *Python 64-bit Module Path* → `.env\Lib\site-packages`, or apply the bundled `TDPyEnvManagerContext.yaml` context. (See docs/02.)
+3. **Open `SegmentationTD.toe`**, or create a Script TOP and paste in `td_script_top.py`.
+4. **Setup Parameters** on the Script TOP → pick a **Backend** → **Reload Model**.
+5. **Wire any TOP** into the Script TOP input. YOLO runs immediately; for SAM pulse **Run SAM** (leave **Auto Run** off).
 
-## Supported Models
+Full docs: **[docs/README.md](docs/README.md)** - installation, Script TOP setup, backends, AMG, troubleshooting.
 
-| Model | Backend | Speed | Realtime | Prompts | Best For |
-|-------|---------|-------|----------|---------|----------|
-| **YOLO11** | `yolo` | ~30ms | Yes | None (auto-detect) | Webcam, fast batch processing |
-| **SAM 2** | `sam` | 2-10 min | No | Points, boxes | Zero-shot with visual prompts |
-| **SAM 3** | `sam3` | ~30ms GPU | No | Text, exemplars | Concept segmentation |
+## Backends
 
-### YOLO11 Models
+| Backend | Realtime | Prompts | Best For |
+|---------|----------|---------|----------|
+| **YOLO11** | Yes (every cook) | None (auto-detect) | Live video |
+| **SAM 2** | On demand | Points, box, AMG | Zero-shot masks |
+| **SAM 3** | On demand | Text, box exemplar, AMG | Concept segmentation |
 
-| Model | Size | GPU FPS | MPS FPS | CPU FPS |
-|-------|------|---------|---------|---------|
-| yolo11n-seg | 5.9 MB | 200+ | 30-60 | 10-15 |
-| yolo11s-seg | 23 MB | 150+ | 25-40 | 8-12 |
-| yolo11m-seg | 83 MB | 100+ | 15-25 | 5-8 |
+## Script TOP Parameters
 
-### SAM 2 Models
+| Parameter | Purpose |
+|-----------|---------|
+| `Backend` | `yolo` / `sam` / `sam3` |
+| `Model` | `.pt` file (empty = auto per backend) |
+| `Device` | `auto` / `cpu` / `cuda:0` |
+| `Confidence` / `Iou` / `Imgsize` | Inference tuning |
+| `Maskalpha` | Overlay opacity (SAM/AMG) |
+| `Showboxes` / `Showlabels` | YOLO annotations |
+| `Maskonly` | White-on-black mask output |
+| `Autorun` | SAM runs every frame when on |
+| `Textprompts` | SAM 3 concepts ("person, car") |
+| `Points` / `Bbox` | SAM 2/3 visual prompts |
+| `Amgpoints` | AMG grid density (8/16/32) |
+| `Reloadmodel` | Force model reload |
+| `Runsam` | Run SAM/AMG now |
 
-| Model | Size | Use Case |
-|-------|------|----------|
-| sam2_t.pt | 78 MB | Fastest, edge devices |
-| sam2_s.pt | ~100 MB | Balanced |
-| sam2_b.pt | 162 MB | Standard |
-| sam2_l.pt | ~200 MB | Highest accuracy |
-| sam2.1_* | Same | Updated versions |
-
-### SAM 3
-
-| Model | Size | Features |
-|-------|------|----------|
-| sam3.pt | 3.4 GB | Text prompts, image exemplars, concept detection |
-
----
-
-## Setup
-
-### Step 1: Clone the Repository
-
-```bash
-git clone https://github.com/ehfazrezwan/segment-everything-td.git
-cd segment-everything-td
-```
-
-### Step 2: Create Python Environment
+## Command Line (secondary)
 
 ```bash
-# Create virtual environment
-python -m venv env
-
-# Activate it
-source env/bin/activate      # macOS/Linux
-# or: env\Scripts\activate   # Windows
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### Step 3: Note Your Python Path
-
-You'll need the full path to the Python executable for TouchDesigner:
-
-```bash
-# macOS/Linux - run this to get the path:
-which python
-# Example output: /Users/yourname/segment-everything-td/env/bin/python
-
-# Windows:
-where python
-# Example output: C:\Users\yourname\segment-everything-td\env\Scripts\python.exe
-```
-
-### Step 4: Verify Installation
-
-```bash
-# Test with webcam (YOLO)
-python main.py --list-cameras
-
-# Test with an image
-python main.py --image path/to/test.jpg --output output/
-```
-
----
-
-## Quick Start (Command Line)
-
-```bash
-# Realtime webcam segmentation (YOLO)
-python main.py
-
-# Image segmentation with YOLO
+# Single image - YOLO
 python main.py --image photo.jpg
 
-# Segment everything with SAM 2 (Automatic Mask Generation)
+# SAM 2 segment-everything
 python main.py --backend sam --image photo.jpg
 
-# Text-based segmentation with SAM 3
-python main.py --backend sam3 --image photo.jpg --text "person,car,dog"
+# SAM 3 text prompts
+python main.py --backend sam3 --image photo.jpg --text "person,car"
+
+# Realtime webcam (YOLO only)
+python main.py --camera 0
 ```
 
----
+## Requirements
 
-## TouchDesigner Setup
-
-### Step 1: Load the SegmentationCOMP
-
-Drag `SegmentationCOMP.tox` into your TouchDesigner project.
-
-### Step 2: Configure Parameters
-
-| Parameter | Description |
-|-----------|-------------|
-| **Input TOP** | The TOP to segment (drag any TOP here) |
-| **Python Executable** | Path to your env's Python (from Setup Step 3) |
-| **Project Folder** | Path to your segment-everything-td directory |
-| **Backend** | `YOLO` (fast), `SAM2` (visual prompts), or `SAM3` (text prompts) |
-| **Points Per Side** | AMG grid size for SAM (8=fast, 16=balanced, 32=thorough) |
-| **Confidence** | Detection threshold (0.0-1.0) |
-
-### Step 3: Run Segmentation
-
-1. Connect any TOP to **Input TOP**
-2. Click **Segment** to process
-3. Watch the Textport for progress
-4. Masks appear as OUT TOPs when complete
-5. Click **Clear Masks** to remove generated TOPs
-
-### Features
-
-- **Non-blocking** - TD stays responsive during processing
-- **Progress reporting** - See "Point 128/256 (50%)" during SAM AMG
-- **Dynamic mask loading** - MovieFileIn + OUT TOPs created automatically
-- **Clear Masks** - Remove all generated mask TOPs with one button
-
----
-
-## Command Reference
-
-### Webcam Mode
-
-```bash
-python main.py [options]
-
-# Camera
---list-cameras          # Show available cameras
---camera N              # Use camera N directly
-
-# Model
---model MODEL           # Model file (e.g., yolo11s-seg.pt)
---device DEVICE         # Force device (cuda:0, mps, cpu)
---conf THRESHOLD        # Confidence threshold (default: 0.25)
-
-# Display
---boxes                 # Show bounding boxes
---labels                # Show class labels
---no-masks              # Hide segmentation masks
---no-fps                # Hide FPS overlay
-```
-
-### Image Mode
-
-```bash
-python main.py --image PATH [options]
-
-# Backend selection
---backend yolo          # YOLO11 (default, fast)
---backend sam           # SAM 2 (zero-shot, visual prompts)
---backend sam3          # SAM 3 (text prompts)
-
-# Output
---output DIR            # Output directory (default: output/)
---no-individual-masks   # Skip individual mask files
---no-composite          # Skip composite overlay
---no-metadata           # Skip metadata JSON
-
-# SAM prompts
---text "a,b,c"          # Text prompts (SAM 3 only)
---points X,Y            # Point prompt
---bbox X1,Y1,X2,Y2      # Box prompt
-
-# Automatic Mask Generation
---points-per-side N     # Grid size: 8 (fast), 16 (balanced), 32 (thorough)
---nms-thresh T          # NMS threshold for duplicate removal
-```
-
-### TouchDesigner CLI
-
-```bash
-python td_segment.py --image PATH --output DIR --run-id ID [options]
-
---backend BACKEND       # yolo, sam, or sam3
---points-per-side N     # AMG grid size
---conf THRESHOLD        # Confidence threshold
-```
-
----
-
-## Output Structure
-
-Each segmentation run produces:
-
-```
-output/
-└── {run_id}/
-    ├── done.json                 # Completion marker (for TD polling)
-    ├── progress.json             # Progress updates (for TD display)
-    ├── input_annotated.jpg       # Annotated visualization
-    ├── input_composite.png       # All masks composited
-    ├── input_mask_0_person.png   # Individual binary masks
-    ├── input_mask_1_car.png
-    └── input_metadata.json       # Detection details
-```
-
----
+- TouchDesigner 2023.10000+ (Python 3.11)
+- Python 3.9+
+- Optional: NVIDIA GPU with CUDA
+- Models download automatically to `models/` (SAM 3 ~3.4 GB, may need Hugging Face approval)
 
 ## Project Structure
 
 ```
-segment-everything-td/
-├── main.py                 # Main entry point
-├── td_segment.py           # TouchDesigner CLI wrapper
-├── SegmentationCOMP.tox    # TouchDesigner component
-├── requirements.txt        # Python dependencies
-├── models/                 # Downloaded model files
-├── output/                 # Segmentation output
-├── temp/                   # TD temp files
-├── src/
-│   ├── config.py           # Configuration & device detection
-│   ├── detectors/
-│   │   ├── base.py         # Abstract detector + progress callbacks
-│   │   ├── yolo_detector.py
-│   │   ├── sam2_detector.py
-│   │   ├── sam3_detector.py
-│   │   ├── amg.py          # Automatic Mask Generation
-│   │   └── factory.py      # Detector factory
-│   ├── camera.py           # Webcam handling
-│   ├── visualizer.py       # Display utilities
-│   ├── app.py              # Webcam application
-│   └── image_processor.py  # Image mode + TD integration
-└── docs/
-    ├── 01-overview.md
-    ├── 02-installation.md
-    ├── 03-configuration.md
-    ├── 04-running.md
-    ├── 05-customization.md
-    ├── 06-image-mode.md
-    ├── 07-meta-sam-integration.md
-    ├── 08-automatic-mask-generation.md
-    └── 09-touchdesigner-integration.md
+├── td_script_top.py          # Script TOP callbacks (primary)
+├── SegmentationTD.toe        # Ready-made TD project
+├── main.py                   # CLI entry point
+├── td_segment.py             # Legacy subprocess wrapper
+├── TDPyEnvManagerContext.yaml# TD Python Environment Manager context
+├── src/                      # Python package (TOP + CLI)
+│   ├── config.py             # Config & device auto-detection
+│   ├── detectors/            # YOLO / SAM 2 / SAM 3 + AMG
+│   └── ...
+└── docs/                     # Documentation
 ```
 
----
+## Documentation
 
-## Requirements
-
-- Python 3.9+
-- Webcam (for realtime mode)
-- TouchDesigner 2023.10000+ (for TD integration)
-- Optional: NVIDIA GPU with CUDA for faster inference
-- Optional: Apple Silicon for MPS acceleration
-
----
-
-## Roadmap
-
-- [x] YOLO11 instance segmentation
-- [x] Image segmentation with mask extraction
-- [x] Meta SAM 2 integration (visual prompts)
-- [x] Meta SAM 3 integration (text prompts)
-- [x] Automatic Mask Generation (segment everything)
-- [x] TouchDesigner integration with progress reporting
-- [ ] Interactive point selection in TD (visual prompts for SAM 2)
-- [ ] Text prompt input in TD (concept segmentation with SAM 3)
-- [ ] Background replacement/removal
-- [ ] NDI/Spout/Syphon direct output
-- [ ] Multi-camera support
-- [ ] Batch processing mode
-
----
+- [01 - Overview](docs/01-overview.md)
+- [02 - Installation](docs/02-installation.md)
+- [03 - TouchDesigner Setup](docs/03-touchdesigner-setup.md)
+- [04 - Script TOP Inference](docs/04-script-top-inference.md)
+- [05 - Backends](docs/05-backends.md)
+- [06 - Command Line](docs/06-command-line.md)
+- [07 - Configuration](docs/07-configuration.md)
+- [08 - Automatic Mask Generation](docs/08-automatic-mask-generation.md)
+- [09 - Troubleshooting](docs/09-troubleshooting.md)
 
 ## License
 
-This project uses:
 - **Ultralytics YOLO11** - AGPL-3.0
-- **Meta SAM 2/3** - Apache 2.0
-
----
-
-## Acknowledgments
-
-- [Ultralytics](https://ultralytics.com/) for YOLO11 and SAM integration
-- [Meta AI](https://ai.meta.com/) for SAM 2 and SAM 3 models
-- [Derivative](https://derivative.ca/) for TouchDesigner
+- **Meta SAM 2 / SAM 3** - Apache 2.0
